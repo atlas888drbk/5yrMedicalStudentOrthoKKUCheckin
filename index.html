@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>เช็คอิน วอร์ด 5ค</title>
+<link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async></script>
+<style>
+:root {
+  --bg:#0a0f1e;--surface:#111827;--surface2:#1a2235;
+  --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.14);
+  --text:#e8eaf0;--muted:#6b7a99;
+  --accent:#3b82f6;--accent-dim:rgba(59,130,246,0.15);
+  --green:#22c55e;--green-dim:rgba(34,197,94,0.12);
+  --red:#ef4444;--red-dim:rgba(239,68,68,0.12);
+  --amber:#f59e0b;--amber-dim:rgba(245,158,11,0.12);
+  --r:16px;--rsm:10px;
+  --font:'Sarabun',sans-serif;--mono:'IBM Plex Mono',monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding-bottom:48px;font-size:15px}
+.screen{width:100%;max-width:480px;padding:0 20px;display:none;flex-direction:column}
+.screen.active{display:flex}
+
+/* LOGIN */
+#loginScreen{align-items:center;justify-content:center;min-height:100vh;gap:0}
+.login-logo{width:72px;height:72px;border-radius:20px;background:var(--accent-dim);border:1px solid rgba(59,130,246,0.3);display:flex;align-items:center;justify-content:center;font-size:32px;margin-bottom:24px}
+.login-title{font-size:24px;font-weight:600;text-align:center;margin-bottom:6px}
+.login-sub{font-size:13px;color:var(--muted);text-align:center;margin-bottom:32px;font-family:var(--mono)}
+.login-box{width:100%;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);padding:28px 24px;display:flex;flex-direction:column;align-items:center;gap:14px}
+.login-note{font-size:12px;color:var(--muted);text-align:center;line-height:1.7}
+.login-note span{color:#93c5fd}
+.domain-badge{display:inline-flex;align-items:center;gap:6px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);color:var(--green);font-size:11px;font-family:var(--mono);padding:4px 10px;border-radius:99px}
+#googleBtn{width:100%;padding:13px 20px;border-radius:10px;background:#fff;border:1px solid #ddd;display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--font);font-size:15px;font-weight:500;color:#1f1f1f;cursor:pointer;transition:background .15s,box-shadow .15s}
+#googleBtn:hover{background:#f8f8f8;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+#googleBtn svg{width:20px;height:20px;flex-shrink:0}
+.domain-err{width:100%;background:var(--red-dim);border:1px solid rgba(239,68,68,0.25);border-radius:var(--rsm);padding:12px 16px;font-size:13px;color:var(--red);display:none}
+
+/* MAIN */
+#mainScreen{gap:0;padding-top:0}
+.topbar{width:100%;max-width:480px;display:flex;align-items:center;justify-content:space-between;padding:18px 20px 0}
+.topbar-ward{font-size:12px;font-family:var(--mono);color:var(--muted)}
+.user-pill{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border2);border-radius:99px;padding:5px 10px 5px 5px;cursor:pointer}
+.user-avatar{width:26px;height:26px;border-radius:50%;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:12px;color:#93c5fd;font-weight:600;overflow:hidden}
+.user-avatar img{width:100%;height:100%;border-radius:50%}
+.user-name{font-size:12px;font-weight:500;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-logout{font-size:11px;color:var(--muted)}
+.header{padding:16px 20px 0;width:100%;max-width:480px}
+.header h1{font-size:22px;font-weight:600}
+.header-sub{font-size:12px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.dot-live{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 2s infinite;vertical-align:middle;margin-right:4px}
+.gap{height:14px}.gap-sm{height:8px}
+.label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;font-family:var(--mono)}
+.clock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:18px 20px;display:flex;justify-content:space-between;align-items:center}
+.clock-time{font-family:var(--mono);font-size:34px;font-weight:500;letter-spacing:-1px}
+.clock-date{font-size:12px;color:var(--muted);margin-top:3px}
+.deadline-badge{text-align:right}
+.deadline-label{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.deadline-val{font-family:var(--mono);font-size:20px;font-weight:500}
+.ok{color:var(--green)}.warn{color:var(--amber)}.late-c{color:var(--red)}
+.userinfo-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 20px;display:flex;align-items:center;gap:14px}
+.avatar-lg{width:48px;height:48px;border-radius:50%;flex-shrink:0;background:var(--accent-dim);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:600;color:#93c5fd;overflow:hidden}
+.avatar-lg img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.userinfo-name{font-weight:600;font-size:15px}
+.userinfo-email{font-size:12px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.verified-badge{margin-left:auto;display:flex;align-items:center;gap:4px;background:var(--green-dim);border:1px solid rgba(34,197,94,0.2);color:var(--green);font-size:11px;font-family:var(--mono);padding:4px 9px;border-radius:99px;flex-shrink:0}
+.geo-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 20px;display:flex;align-items:center;gap:14px;cursor:pointer;transition:border-color .2s;user-select:none}
+.geo-card:active{background:var(--surface2)}
+.geo-icon{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px;transition:background .3s}
+.geo-icon.idle{background:var(--surface2)}.geo-icon.loading{background:var(--accent-dim)}.geo-icon.ok{background:var(--green-dim)}.geo-icon.fail{background:var(--red-dim)}
+.geo-info{flex:1;min-width:0}
+.geo-title{font-weight:500;font-size:14px}
+.geo-sub{font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.geo-dist{font-family:var(--mono);font-size:13px;font-weight:500;flex-shrink:0;text-align:right}
+.btn-checkin{width:100%;padding:17px;border-radius:var(--r);border:none;font-family:var(--font);font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.02em}
+.btn-checkin.ready{background:var(--green);color:#052e16}
+.btn-checkin.ready:active{transform:scale(0.97)}
+.btn-checkin.not-ready{background:var(--surface2);color:var(--muted);border:1px solid var(--border)}
+.btn-checkin:disabled{opacity:.4;cursor:not-allowed}
+.checked-card{background:var(--green-dim);border:1px solid rgba(34,197,94,0.25);border-radius:var(--r);padding:24px 20px;text-align:center;display:flex;flex-direction:column;align-items:center}
+.checked-card .big{font-size:28px;font-weight:600;font-family:var(--mono);color:var(--green)}
+.checked-card .sub{font-size:13px;color:var(--muted);margin-top:4px}
+.log-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.log-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--rsm);padding:12px 14px;display:grid;grid-template-columns:1fr auto;gap:6px;align-items:start;animation:slideIn .3s ease;margin-bottom:8px}
+.log-name{font-weight:500;font-size:13px}
+.log-meta{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:2px}
+.log-deduct{font-size:11px;color:var(--red);font-family:var(--mono);margin-top:2px}
+.pill{font-size:11px;font-family:var(--mono);font-weight:500;padding:3px 9px;border-radius:99px}
+.pill.ontime{background:var(--green-dim);color:var(--green);border:1px solid rgba(34,197,94,0.2)}
+.pill.late{background:var(--amber-dim);color:var(--amber);border:1px solid rgba(245,158,11,0.2)}
+.empty-log{text-align:center;color:var(--muted);font-size:12px;padding:16px 0;font-family:var(--mono)}
+.sheets-btn{display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--rsm);padding:12px 16px;font-size:13px;color:var(--muted);cursor:pointer;text-decoration:none;transition:border-color .2s}
+.sheets-btn:hover{border-color:var(--accent);color:var(--text)}
+.sync-status{font-size:11px;font-family:var(--mono);margin-top:6px;padding:0 4px}
+.sync-ok{color:var(--green)}.sync-fail{color:var(--red)}.sync-pending{color:var(--muted)}
+.toast{position:fixed;bottom:28px;left:50%;transform:translateX(-50%) translateY(60px);background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:12px 20px;font-size:13px;font-weight:500;white-space:nowrap;transition:transform .35s cubic-bezier(0.34,1.56,0.64,1),opacity .3s;opacity:0;z-index:999;pointer-events:none;max-width:90vw}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+@keyframes slideIn{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen" class="screen active">
+  <div class="login-logo">🏥</div>
+  <div class="login-title">เช็คอิน วอร์ด 5ค</div>
+  <div class="login-sub">ระบบลงเวลา · นศ.พ. ชั้นปีที่ 5</div>
+  <div class="login-box">
+    <div class="domain-badge">✓ @kkumail.com / @kku.ac.th</div>
+    <button id="googleBtn" onclick="startGoogleLogin()">
+      <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      เข้าสู่ระบบด้วย Google
+    </button>
+    <div class="domain-err" id="domainErr">❌ กรุณาใช้ @kkumail.com หรือ @kku.ac.th เท่านั้น</div>
+    <div class="login-note">ระบบจะตรวจสอบว่าคุณอยู่ใน<br><span>รัศมี 25 เมตรจากวอร์ด 5ค</span><br>ก่อนอนุญาตให้ลงเวลา</div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div id="mainScreen" class="screen">
+  <div class="topbar">
+    <div class="topbar-ward"><span class="dot-live"></span>Ward 5K · KKU Hospital</div>
+    <div class="user-pill" onclick="confirmLogout()">
+      <div class="user-avatar" id="topAvatar"></div>
+      <span class="user-name" id="topName"></span>
+      <span class="user-logout">ออก</span>
+    </div>
+  </div>
+  <div class="header">
+    <h1>ลงเวลาเข้าวอร์ด</h1>
+    <div class="header-sub" id="headerDate">—</div>
+  </div>
+  <div class="gap"></div>
+
+  <!-- User -->
+  <div style="padding:0 20px;width:100%;max-width:480px">
+    <div class="label">ผู้ใช้งาน</div>
+    <div class="userinfo-card">
+      <div class="avatar-lg" id="mainAvatar"></div>
+      <div><div class="userinfo-name" id="mainName">—</div><div class="userinfo-email" id="mainEmail">—</div></div>
+      <div class="verified-badge">✓ KKU</div>
+    </div>
+  </div>
+  <div class="gap"></div>
+
+  <!-- Clock -->
+  <div style="padding:0 20px;width:100%;max-width:480px">
+    <div class="label">เวลาปัจจุบัน</div>
+    <div class="clock-card">
+      <div><div class="clock-time" id="clockTime">--:--:--</div><div class="clock-date" id="clockDate">—</div></div>
+      <div class="deadline-badge"><div class="deadline-label">เวลาตัด</div><div class="deadline-val ok" id="deadlineVal">07:00</div></div>
+    </div>
+  </div>
+  <div class="gap"></div>
+
+  <!-- GPS -->
+  <div style="padding:0 20px;width:100%;max-width:480px">
+    <div class="label">ตำแหน่ง GPS</div>
+    <div class="geo-card" id="geoCard" onclick="checkLocation()">
+      <div class="geo-icon idle" id="geoIcon">📍</div>
+      <div class="geo-info">
+        <div class="geo-title" id="geoTitle">กดเพื่อตรวจสอบตำแหน่ง</div>
+        <div class="geo-sub"   id="geoSub">ระบบจะขอสิทธิ์ GPS จากโทรศัพท์</div>
+      </div>
+      <div class="geo-dist" id="geoDist">—</div>
+    </div>
+  </div>
+  <div class="gap"></div>
+
+  <!-- Camera -->
+  <div style="padding:0 20px;width:100%;max-width:480px" id="cameraArea">
+    <div class="label">ถ่ายรูป Selfie</div>
+    <div class="camera-section">
+      <video id="camVideo" class="camera-preview" autoplay playsinline></video>
+      <img  id="camPhoto" class="photo-preview" alt="selfie">
+      <div class="camera-controls">
+        <button class="btn-camera start"  id="btnStartCam" onclick="startCamera()">📷 เปิดกล้อง</button>
+        <button class="btn-camera shoot"  id="btnShoot"    onclick="takePhoto()" style="display:none">📸 ถ่ายรูป</button>
+        <button class="btn-camera retake" id="btnRetake"   onclick="retakePhoto()" style="display:none">🔄 ถ่ายใหม่</button>
+      </div>
+      <div class="photo-status warn" id="photoStatus">⚠ ต้องถ่ายรูปก่อนลงเวลา</div>
+    </div>
+  </div>
+  <div class="gap"></div>
+
+  <!-- Checkin btn -->
+  <div style="padding:0 20px;width:100%;max-width:480px" id="checkinArea">
+    <button class="btn-checkin not-ready" id="btnCheckin" onclick="doCheckin()" disabled>กดตรวจสอบตำแหน่งก่อน</button>
+  </div>
+  <div class="gap"></div><div class="gap"></div>
+
+  <!-- Log -->
+  <div style="padding:0 20px;width:100%;max-width:480px">
+    <div class="log-header"><div class="label" style="margin:0">บันทึกวันนี้</div></div>
+    <div id="logList"><div class="empty-log">ยังไม่มีการลงเวลาวันนี้</div></div>
+  </div>
+  <div class="gap"></div>
+
+  <!-- Sheets -->
+  <div style="padding:0 20px;width:100%;max-width:480px">
+    <div class="label">ข้อมูลรวม (อาจารย์)</div>
+    <a class="sheets-btn" id="sheetsLink" href="https://docs.google.com/spreadsheets/d/1XIlsAKTmloLDWIccTo8NOaH-1qfZfXlmos05vtvLrRA/edit?gid=0#gid=0" target="_blank">
+      <span>📊</span><span>เปิด Google Sheets ดูข้อมูลรวม</span>
+    </a>
+    <div class="sync-status sync-pending" id="syncStatus">— ยังไม่ได้ตั้งค่า Apps Script</div>
+  </div>
+</div>
+
+<canvas id="camCanvas" style="display:none"></canvas>
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════
+// ★ CONFIG — แก้ตรงนี้ก่อนใช้งานจริง
+// ═══════════════════════════════════════
+const CONFIG = {
+  CLIENT_ID:      '359833249845-d2egfn2je6tp22ah36vj6vt2lbtv3mef.apps.googleusercontent.com',
+  ALLOWED_DOMAINS: ['kkumail.com', 'kku.ac.th'],  // นักศึกษา + อาจารย์
+  WARD_LAT:       16.468611,
+  WARD_LNG:       102.829278,
+  RADIUS_M:       25,
+  CUTOFF_WEEKDAY: '07:00',   // จันทร์-ศุกร์
+  CUTOFF_WEEKEND: '07:30',   // เสาร์-อาทิตย์
+  get CUTOFF() {
+    const day = new Date().getDay(); // 0=อาทิตย์, 6=เสาร์
+    return (day === 0 || day === 6) ? this.CUTOFF_WEEKEND : this.CUTOFF_WEEKDAY;
+  },
+  APPS_SCRIPT_URL:'https://script.google.com/macros/s/AKfycbwv3L_vfx_NjbR12Qsqtyb9GqNAmqBGDUjKdtrjzVG86hve9GcsmKTEUuHo2NbtpVrF/exec',  // จาก Google Apps Script
+  SHEET_URL:      'https://docs.google.com/spreadsheets/d/1XIlsAKTmloLDWIccTo8NOaH-1qfZfXlmos05vtvLrRA/edit?gid=0#gid=0',
+  TEACHER_EMAILS: ['kittwi-cvt@kkumail.com', 'kittwi@kku.ac.th'],  // ← ใส่ email อาจารย์ที่ต้องการให้เห็น Sheet        // ลิงก์ Google Sheet
+};
+
+let currentUser=null, geoState='idle', lastDist=null, lastCoords=null, todayCheckedIn=false;
+
+// ── Google Login ──
+function startGoogleLogin(){
+  if(CONFIG.CLIENT_ID.startsWith('YOUR_')){ demoLogin(); return; }
+  google.accounts.oauth2.initTokenClient({
+    client_id:CONFIG.CLIENT_ID, scope:'openid profile email',
+    callback:handleToken,
+  }).requestAccessToken();
+}
+function handleToken(t){
+  if(t.error) return;
+  fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:`Bearer ${t.access_token}`}})
+  .then(r=>r.json()).then(info=>{
+    if(!CONFIG.ALLOWED_DOMAINS.includes(info.email.split('@')[1])){
+      document.getElementById('domainErr').style.display='block'; return;
+    }
+    document.getElementById('domainErr').style.display='none';
+    currentUser={name:info.name,email:info.email,picture:info.picture,given_name:info.given_name||info.name.split(' ')[0]};
+    enterMain();
+  });
+}
+function demoLogin(){
+  currentUser={name:'นพ.ณัฐวุฒิ สมบูรณ์',email:'nattawut.s@kkumail.com',picture:null,given_name:'ณัฐวุฒิ'};
+  showToast('🔧 Demo mode — ยังไม่ได้ตั้งค่า CLIENT_ID');
+  enterMain();
+}
+function enterMain(){
+  document.getElementById('loginScreen').classList.remove('active');
+  document.getElementById('mainScreen').classList.add('active');
+  const ini=currentUser.given_name[0];
+  ['topAvatar','mainAvatar'].forEach(id=>{
+    const el=document.getElementById(id);
+    el.innerHTML=currentUser.picture?`<img src="${currentUser.picture}" alt="">`:`${ini}`;
+  });
+  document.getElementById('topName').textContent=currentUser.given_name;
+  document.getElementById('mainName').textContent=currentUser.name;
+  document.getElementById('mainEmail').textContent=currentUser.email;
+  if(!CONFIG.SHEET_URL.startsWith('YOUR_')) document.getElementById('sheetsLink').href=CONFIG.SHEET_URL;
+  checkAlreadyCheckedIn(); renderLog();
+  // แสดง Sheets section เฉพาะอาจารย์
+  const section = document.getElementById('sheetsSection');
+  if(section && CONFIG.TEACHER_EMAILS.includes(currentUser.email)){
+    section.style.display = 'block';
+  }
+}
+function confirmLogout(){
+  if(confirm('ออกจากระบบ?')){
+    currentUser=null; todayCheckedIn=false; geoState='idle';
+    setGeoState('idle');
+    document.getElementById('checkinArea').innerHTML=`<button class="btn-checkin not-ready" id="btnCheckin" onclick="doCheckin()" disabled>กดตรวจสอบตำแหน่งก่อน</button>`;
+    document.getElementById('mainScreen').classList.remove('active');
+    document.getElementById('loginScreen').classList.add('active');
+  }
+}
+
+// ── Clock ──
+function updateClock(){
+  const n=new Date(), p=x=>String(x).padStart(2,'0');
+  document.getElementById('clockTime').textContent=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+  const D=['อาทิตย์','จันทร์','อังคาร','พุธ','พฤหัสบดี','ศุกร์','เสาร์'];
+  const M=['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  const ds=`วัน${D[n.getDay()]}ที่ ${n.getDate()} ${M[n.getMonth()]} ${n.getFullYear()+543}`;
+  document.getElementById('clockDate').textContent=ds;
+  document.getElementById('headerDate').textContent=`${n.getDate()} ${M[n.getMonth()]} ${n.getFullYear()+543}`;
+  const el=document.getElementById('deadlineVal');
+  const [ch,cm]=CONFIG.CUTOFF.split(':').map(Number);
+  const diff=(n.getHours()*60+n.getMinutes())-(ch*60+cm);
+  document.getElementById('deadlineVal').textContent = CONFIG.CUTOFF;
+  el.className='deadline-val '+(diff<-10?'ok':diff<0?'warn':'late-c');
+}
+setInterval(updateClock,1000); updateClock();
+
+// ── Geo ──
+function haversine(la1,lo1,la2,lo2){
+  const R=6371000,r=d=>d*Math.PI/180;
+  const a=Math.sin(r(la2-la1)/2)**2+Math.cos(r(la1))*Math.cos(r(la2))*Math.sin(r(lo2-lo1)/2)**2;
+  return R*2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+function setGeoState(state,sub,dist){
+  geoState=state;
+  const S={
+    idle: {i:'📍',t:'กดเพื่อตรวจสอบตำแหน่ง',s:'ระบบจะขอสิทธิ์ GPS จากโทรศัพท์',d:'—',dc:''},
+    loading:{i:'🔄',t:'กำลังระบุตำแหน่ง…',s:'รอสักครู่',d:'…',dc:''},
+    ok:   {i:'✅',t:'อยู่ในพื้นที่วอร์ด',s:sub||'',d:Math.round(dist||0)+' ม.',dc:'ok'},
+    fail: {i:'❌',t:'นอกพื้นที่วอร์ด',s:sub||'',d:dist!=null?Math.round(dist)+' ม.':'—',dc:'late-c'},
+  }[state]||{};
+  document.getElementById('geoIcon').className=`geo-icon ${state}`;
+  document.getElementById('geoIcon').textContent=S.i;
+  document.getElementById('geoTitle').textContent=S.t;
+  document.getElementById('geoSub').textContent=S.s;
+  document.getElementById('geoDist').textContent=S.d;
+  document.getElementById('geoDist').className=`geo-dist ${S.dc}`;
+  lastDist=dist;
+  if(todayCheckedIn) return;
+  const btn=document.getElementById('btnCheckin');
+  if(!btn) return;
+  if(state==='ok'){ updateCheckinBtn(); }
+  else{btn.className='btn-checkin not-ready';btn.disabled=true;btn.textContent=state==='loading'?'กำลังตรวจสอบ…':state==='fail'?'ไม่สามารถลงเวลาได้ (นอกพื้นที่)':'กดตรวจสอบตำแหน่งก่อน';}
+}
+function checkLocation(){
+  if(geoState==='loading'||todayCheckedIn) return;
+  if(!('geolocation' in navigator)){setGeoState('fail','เบราว์เซอร์ไม่รองรับ GPS',null);return;}
+  setGeoState('loading');
+  navigator.geolocation.getCurrentPosition(
+    pos=>{
+      const{latitude:la,longitude:lo,accuracy:ac}=pos.coords;
+      lastCoords={lat:la,lng:lo,accuracy:ac};
+      const dist=haversine(la,lo,CONFIG.WARD_LAT,CONFIG.WARD_LNG);
+      setGeoState(dist<=CONFIG.RADIUS_M?'ok':'fail',`${la.toFixed(5)}, ${lo.toFixed(5)} (±${Math.round(ac)}ม.)`,dist);
+    },
+    err=>{
+      const m=err.code===1?'ไม่ได้รับสิทธิ์ GPS':err.code===2?'ระบุตำแหน่งไม่ได้':'หมดเวลา';
+      setGeoState('fail',m,null);
+    },
+    {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+  );
+}
+
+// ── Check-in ──
+function calcDeduction(t){
+  const[h,m]=t.split(':').map(Number),[ch,cm]=CONFIG.CUTOFF.split(':').map(Number);
+  const late=(h*60+m)-(ch*60+cm);
+  if(late<=0) return{status:'ontime',late:0,deduct:0};
+  if(late<=15) return{status:'late',late,deduct:1};
+  if(late<=30) return{status:'late',late,deduct:2};
+  return{status:'late',late,deduct:5};
+}
+function todayKey(){return new Date().toISOString().slice(0,10)}
+function checkAlreadyCheckedIn(){
+  if(!currentUser) return;
+  try{
+    const logs=JSON.parse(localStorage.getItem('ward_logs_v3')||'[]');
+    const f=logs.find(l=>l.email===currentUser.email&&l.date===todayKey());
+    if(f) showCheckedCard(f);
+  }catch(e){}
+}
+function showCheckedCard(e){
+  todayCheckedIn=true;
+  const badge=e.status==='ontime'?`<span style="color:var(--green)">✓ ตรงเวลา</span>`:`<span style="color:var(--amber)">⚠ สาย ${e.late} นาที · หัก ${e.deduct} คะแนน</span>`;
+  document.getElementById('checkinArea').innerHTML=`<div class="checked-card"><div class="big">${e.time}</div><div class="sub">ลงเวลาแล้ววันนี้ · ${badge}</div><div class="sub" style="margin-top:4px;font-family:var(--mono);font-size:11px">${e.dist} ม. จากวอร์ด</div></div>`;
+}
+async function doCheckin(){
+  if(!currentUser||geoState!=='ok'||todayCheckedIn) return;
+  const n=new Date(),p=x=>String(x).padStart(2,'0');
+  const ts=`${p(n.getHours())}:${p(n.getMinutes())}`;
+  const full=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
+  const{status,late,deduct}=calcDeduction(ts);
+  const entry={
+    email:currentUser.email,name:currentUser.name,date:todayKey(),
+    time:full,status,late,deduct,dist:Math.round(lastDist||0),
+    lat:lastCoords?.lat,lng:lastCoords?.lng,accuracy:Math.round(lastCoords?.accuracy||0),
+    photo:photoBase64,
+    deviceId:deviceFingerprint||'unknown',
+    synced:false,
+  };
+  try{const logs=JSON.parse(localStorage.getItem('ward_logs_v3')||'[]');logs.unshift(entry);localStorage.setItem('ward_logs_v3',JSON.stringify(logs.slice(0,100)));}catch(e){}
+  sendToSheets(entry);
+  showCheckedCard(entry); renderLog();
+  showToast(status==='ontime'?`✓ ลงเวลาสำเร็จ ${full} — ตรงเวลา`:`⚠ ลงเวลาสำเร็จ ${full} — สาย ${late} นาที หัก ${deduct} คะแนน`);
+}
+
+// ── Send to Sheets ──
+function sendToSheets(entry){
+  if(CONFIG.APPS_SCRIPT_URL.startsWith('YOUR_')){
+    document.getElementById('syncStatus').textContent='⚠ ยังไม่ได้ตั้งค่า Apps Script URL';
+    document.getElementById('syncStatus').className='sync-status sync-fail';
+    return;
+  }
+  document.getElementById('syncStatus').textContent='⏳ กำลังส่งข้อมูลไป Sheets…';
+  document.getElementById('syncStatus').className='sync-status sync-pending';
+  fetch(CONFIG.APPS_SCRIPT_URL,{
+    method:'POST', mode:'no-cors',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(entry),
+  }).then(()=>{
+    document.getElementById('syncStatus').textContent=`✓ ซิงค์ข้อมูลสำเร็จ ${new Date().toLocaleTimeString('th-TH')}`;
+    document.getElementById('syncStatus').className='sync-status sync-ok';
+  }).catch(()=>{
+    document.getElementById('syncStatus').textContent='❌ ส่งข้อมูลไม่สำเร็จ — บันทึกในเครื่องแล้ว';
+    document.getElementById('syncStatus').className='sync-status sync-fail';
+  });
+}
+
+// ── Render log ──
+function renderLog(){
+  const list=document.getElementById('logList');
+  try{
+    const logs=JSON.parse(localStorage.getItem('ward_logs_v3')||'[]');
+    const today=logs.filter(l=>l.date===todayKey());
+    if(!today.length){list.innerHTML='<div class="empty-log">ยังไม่มีการลงเวลาวันนี้</div>';return;}
+    list.innerHTML=today.map(l=>`<div class="log-item"><div><div class="log-name">${l.name}</div><div class="log-meta">${l.time} · ${l.dist} ม. จากวอร์ด</div>${l.deduct>0?`<div class="log-deduct">− ${l.deduct} คะแนน</div>`:''}</div><span class="pill ${l.status==='ontime'?'ontime':'late'}">${l.status==='ontime'?'ตรงเวลา':'สาย '+l.late+' นาที'}</span></div>`).join('');
+  }catch(e){list.innerHTML='<div class="empty-log">โหลดข้อมูลไม่ได้</div>';}
+}
+
+// ── Camera ──
+let photoBase64 = null;
+let stream = null;
+
+async function startCamera() {
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+      audio: false
+    });
+    const video = document.getElementById('camVideo');
+    video.srcObject = stream;
+    video.classList.remove('hidden');
+    document.getElementById('camPhoto').classList.remove('show');
+    document.getElementById('btnStartCam').style.display = 'none';
+    document.getElementById('btnShoot').style.display = 'flex';
+    document.getElementById('btnRetake').style.display = 'none';
+    document.getElementById('photoStatus').textContent = '📷 กดถ่ายรูปได้เลย';
+    document.getElementById('photoStatus').className = 'photo-status warn';
+  } catch(err) {
+    showToast('❌ ไม่สามารถเปิดกล้องได้ — กรุณาอนุญาตในเบราว์เซอร์');
+  }
+}
+
+function takePhoto() {
+  const video  = document.getElementById('camVideo');
+  const canvas = document.getElementById('camCanvas');
+  const photo  = document.getElementById('camPhoto');
+  canvas.width  = video.videoWidth  || 640;
+  canvas.height = video.videoHeight || 480;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(video, 0, 0);
+  photoBase64 = canvas.toDataURL('image/jpeg', 0.6);
+  photo.src = photoBase64;
+  photo.classList.add('show');
+  video.classList.add('hidden');
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  document.getElementById('btnShoot').style.display  = 'none';
+  document.getElementById('btnRetake').style.display = 'flex';
+  document.getElementById('photoStatus').textContent = '✓ ถ่ายรูปแล้ว — พร้อมลงเวลา';
+  document.getElementById('photoStatus').className   = 'photo-status ok';
+  updateCheckinBtn();
+}
+
+function retakePhoto() {
+  photoBase64 = null;
+  document.getElementById('camPhoto').classList.remove('show');
+  document.getElementById('btnRetake').style.display = 'none';
+  document.getElementById('photoStatus').textContent = '⚠ ต้องถ่ายรูปก่อนลงเวลา';
+  document.getElementById('photoStatus').className   = 'photo-status warn';
+  startCamera();
+  updateCheckinBtn();
+}
+
+function updateCheckinBtn() {
+  if(todayCheckedIn) return;
+  const btn = document.getElementById('btnCheckin');
+  if(!btn) return;
+  if(geoState==='ok' && photoBase64) {
+    btn.className='btn-checkin ready'; btn.disabled=false;
+    btn.textContent='✓ ลงเวลาเข้าปฏิบัติงาน';
+  } else if(geoState==='ok' && !photoBase64) {
+    btn.className='btn-checkin not-ready'; btn.disabled=true;
+    btn.textContent='กรุณาถ่ายรูป Selfie ก่อน';
+  }
+}
+
+// ── Device Fingerprint ──
+async function getDeviceFingerprint() {
+  const components = [
+    navigator.userAgent,
+    navigator.language,
+    screen.width + 'x' + screen.height,
+    screen.colorDepth,
+    new Date().getTimezoneOffset(),
+    navigator.hardwareConcurrency || 0,
+    navigator.platform || '',
+  ].join('|');
+  // hash แบบง่าย
+  let hash = 0;
+  for (let i = 0; i < components.length; i++) {
+    const char = components.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  return Math.abs(hash).toString(16).padStart(8,'0');
+}
+
+let deviceFingerprint = null;
+async function initFingerprint() {
+  deviceFingerprint = await getDeviceFingerprint();
+}
+initFingerprint();
+
+let tT; function showToast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>e.classList.remove('show'),3800);}
+</script>
+</body>
+</html>
