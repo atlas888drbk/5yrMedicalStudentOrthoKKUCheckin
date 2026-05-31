@@ -376,6 +376,13 @@ function showCheckedCard(e){
 }
 async function doCheckin(){
   if(!currentUser||geoState!=='ok'||todayCheckedIn) return;
+
+  // ล็อคปุ่ม + แสดง loading ทันที
+  const btn = document.getElementById('btnCheckin');
+  btn.disabled = true;
+  btn.className = 'btn-checkin not-ready';
+  btn.textContent = '⏳ กำลังบันทึก…';
+
   const n=new Date(),p=x=>String(x).padStart(2,'0');
   const ts=`${p(n.getHours())}:${p(n.getMinutes())}`;
   const full=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
@@ -388,32 +395,82 @@ async function doCheckin(){
     deviceId:deviceFingerprint||'unknown',
     synced:false,
   };
+
+  // บันทึก localStorage ไว้ก่อน
   try{const logs=JSON.parse(localStorage.getItem('ward_logs_v3')||'[]');logs.unshift(entry);localStorage.setItem('ward_logs_v3',JSON.stringify(logs.slice(0,100)));}catch(e){}
-  sendToSheets(entry);
-  showCheckedCard(entry); renderLog();
-  showToast(status==='ontime'?`✓ ลงเวลาสำเร็จ ${full} — ตรงเวลา`:`⚠ ลงเวลาสำเร็จ ${full} — สาย ${late} นาที หัก ${deduct} คะแนน`);
+
+  // ★ ส่ง Sheets และรอผลจริงๆ ก่อนแสดงหน้าสำเร็จ
+  const ok = await sendToSheets(entry);
+
+  if(ok){
+    // ✅ สำเร็จจริง — อัปเดต synced flag
+    try{
+      const logs=JSON.parse(localStorage.getItem('ward_logs_v3')||'[]');
+      const idx=logs.findIndex(l=>l.email===entry.email&&l.date===entry.date);
+      if(idx!==-1){logs[idx].synced=true;localStorage.setItem('ward_logs_v3',JSON.stringify(logs));}
+    }catch(e){}
+    showCheckedCard(entry); renderLog();
+    showToast(status==='ontime'?`✓ ลงเวลาสำเร็จ ${full} — ตรงเวลา`:`⚠ ลงเวลาสำเร็จ ${full} — สาย ${late} นาที หัก ${deduct} คะแนน`);
+  } else {
+    // ❌ ส่งไม่ถึง — ปลดล็อคปุ่ม ให้ retry
+    btn.disabled = false;
+    btn.className = 'btn-checkin ready';
+    btn.textContent = '🔄 ส่งไม่สำเร็จ — กดเพื่อลองใหม่';
+  }
 }
 
-// ── Send to Sheets ──
-function sendToSheets(entry){
+// ── Send to Sheets (retry 3 ครั้ง, รอ response จริง) ──
+async function sendToSheets(entry){
   if(CONFIG.APPS_SCRIPT_URL.startsWith('YOUR_')){
-    document.getElementById('syncStatus').textContent='⚠ ยังไม่ได้ตั้งค่า Apps Script URL';
-    document.getElementById('syncStatus').className='sync-status sync-fail';
-    return;
+    setSyncStatus('⚠ ยังไม่ได้ตั้งค่า Apps Script URL','sync-fail'); return false;
   }
-  document.getElementById('syncStatus').textContent='⏳ กำลังส่งข้อมูลไป Sheets…';
-  document.getElementById('syncStatus').className='sync-status sync-pending';
-  fetch(CONFIG.APPS_SCRIPT_URL,{
-    method:'POST', mode:'no-cors',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(entry),
-  }).then(()=>{
-    document.getElementById('syncStatus').textContent=`✓ ซิงค์ข้อมูลสำเร็จ ${new Date().toLocaleTimeString('th-TH')}`;
-    document.getElementById('syncStatus').className='sync-status sync-ok';
-  }).catch(()=>{
-    document.getElementById('syncStatus').textContent='❌ ส่งข้อมูลไม่สำเร็จ — บันทึกในเครื่องแล้ว';
-    document.getElementById('syncStatus').className='sync-status sync-fail';
-  });
+
+  const MAX_RETRY = 3;
+  const TIMEOUT_MS = 15000; // 15 วินาที
+
+  for(let attempt = 1; attempt <= MAX_RETRY; attempt++){
+    setSyncStatus(`⏳ กำลังส่งข้อมูล… (ครั้งที่ ${attempt}/${MAX_RETRY})`,'sync-pending');
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(()=>controller.abort(), TIMEOUT_MS);
+
+      const res = await fetch(CONFIG.APPS_SCRIPT_URL, {
+        method: 'POST',
+        mode: 'cors',                          // ★ เปลี่ยนจาก no-cors → cors
+        headers: { 'Content-Type': 'text/plain' }, // Apps Script ต้องการ text/plain กับ cors
+        body: JSON.stringify(entry),
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      if(!res.ok) throw new Error('HTTP ' + res.status);
+
+      const json = await res.json();
+      if(json.success === false) throw new Error(json.error || 'server error');
+
+      // สำเร็จ
+      setSyncStatus(`✓ บันทึกข้อมูลใน Sheets สำเร็จ ${new Date().toLocaleTimeString('th-TH')}`,'sync-ok');
+      return true;
+
+    } catch(err) {
+      const isLast = attempt === MAX_RETRY;
+      if(isLast){
+        setSyncStatus('❌ ส่งข้อมูลไม่สำเร็จ ' + MAX_RETRY + ' ครั้ง — กดปุ่มลองใหม่','sync-fail');
+        showToast('❌ เชื่อมต่อ Sheets ไม่ได้ — กรุณากดลองใหม่');
+        return false;
+      }
+      // รอก่อน retry (1.5 วินาที)
+      await new Promise(r=>setTimeout(r, 1500));
+    }
+  }
+  return false;
+}
+
+function setSyncStatus(text, cls){
+  const el = document.getElementById('syncStatus');
+  if(!el) return;
+  el.textContent = text;
+  el.className = 'sync-status ' + cls;
 }
 
 // ── Render log ──
