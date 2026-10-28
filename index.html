@@ -1,6 +1,6 @@
 <!--
-  สำเนาอ้างอิง — index.html ปี 5 (repo /5yrMedicalStudentOrthoKKUCheckin) · เก็บใน Project 14 ต.ค. 2569
-  หมายเหตุ: ไฟล์นี้ยังส่งแบบ mode:'no-cors' (ไม่รู้ผลจริง) และเช็คซ้ำจาก localStorage เท่านั้น — ตรวจสอบว่าตรงกับที่ deploy จริง
+  index.html ปี 5 (repo /5yrMedicalStudentOrthoKKUCheckin)
+  v2 · 28 ต.ค. 2569 — วันที่ใช้เวลาไทย (ไม่ใช่ UTC) · เช็คซ้ำจาก server · รอผลบันทึกจริงก่อนขึ้น "สำเร็จ" · เวลาตัดจาก server (รองรับวันหยุด)
 -->
 <!DOCTYPE html>
 <html lang="th">
@@ -227,7 +227,9 @@ const CONFIG = {
   RADIUS_M:       25,
   CUTOFF_WEEKDAY: '07:00',   // จันทร์-ศุกร์
   CUTOFF_WEEKEND: '07:30',   // เสาร์-อาทิตย์
+  SERVER_CUTOFF: null,       // ได้จาก server (รวมวันหยุดราชการ) — ถ้ามีจะใช้ค่านี้ก่อน
   get CUTOFF() {
+    if (this.SERVER_CUTOFF) return this.SERVER_CUTOFF;
     const day = new Date().getDay(); // 0=อาทิตย์, 6=เสาร์
     return (day === 0 || day === 6) ? this.CUTOFF_WEEKEND : this.CUTOFF_WEEKDAY;
   },
@@ -275,7 +277,7 @@ function enterMain(){
   document.getElementById('mainName').textContent=currentUser.name;
   document.getElementById('mainEmail').textContent=currentUser.email;
   if(!CONFIG.SHEET_URL.startsWith('YOUR_')) document.getElementById('sheetsLink').href=CONFIG.SHEET_URL;
-  checkAlreadyCheckedIn(); renderLog();
+  loadServerCutoff(); checkAlreadyCheckedIn(); renderLog();
   // แสดง Sheets section เฉพาะอาจารย์
   const section = document.getElementById('sheetsSection');
   if(section && CONFIG.TEACHER_EMAILS.includes(currentUser.email)){
@@ -364,60 +366,131 @@ function calcDeduction(t){
   if(late<=30) return{status:'late',late,deduct:2};
   return{status:'late',late,deduct:5};
 }
-function todayKey(){return new Date().toISOString().slice(0,10)}
-function checkAlreadyCheckedIn(){
-  if(!currentUser) return;
+// ★ วันที่ตามเวลาไทยเสมอ (เดิมใช้ toISOString = UTC → ก่อน 07:00 กลายเป็น "เมื่อวาน")
+function todayKey(){return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Bangkok'})}
+
+function setSync(text,cls){
+  const el=document.getElementById('syncStatus');
+  el.textContent=text; el.className='sync-status '+cls;
+}
+
+async function fetchJSON(url,opts,ms){
+  const ctl=new AbortController(); const t=setTimeout(()=>ctl.abort(),ms||20000);
+  try{ const r=await fetch(url,{...(opts||{}),signal:ctl.signal}); return await r.json(); }
+  finally{ clearTimeout(t); }
+}
+
+// เวลาตัดของวันนี้จาก server (รู้วันหยุดราชการ)
+async function loadServerCutoff(){
   try{
-    const logs=JSON.parse(localStorage.getItem('ward_logs_v3')||'[]');
-    const f=logs.find(l=>l.email===currentUser.email&&l.date===todayKey());
-    if(f) showCheckedCard(f);
+    const j=await fetchJSON(`${CONFIG.APPS_SCRIPT_URL}?action=cutoff&date=${todayKey()}`,null,10000);
+    if(j&&j.cutoff){ CONFIG.SERVER_CUTOFF=j.cutoff; updateClock(); }
   }catch(e){}
 }
+
+// ★ เช็คจาก server ว่าวันนี้ลงเวลาแล้วหรือยัง (server = ความจริง)
+//   server ตอบไม่ได้ → ค่อยดูในเครื่อง
+async function checkAlreadyCheckedIn(){
+  if(!currentUser) return;
+  const email=currentUser.email, today=todayKey();
+  try{
+    const j=await fetchJSON(`${CONFIG.APPS_SCRIPT_URL}?action=check&email=${encodeURIComponent(email)}&date=${today}`,null,12000);
+    if(!currentUser||currentUser.email!==email) return;
+    if(j&&j.alreadyCheckedIn){
+      showCheckedCard(fromServer(j));
+      setSync('✓ มีบันทึกในระบบแล้ว','sync-ok');
+    }else{
+      // ในเครื่องบอกว่าลงแล้ว แต่ server ไม่มี = ครั้งก่อนส่งไม่สำเร็จ → ให้ลงใหม่ได้
+      const local=getLocalToday();
+      if(local) setSync('⚠ ไม่พบบันทึกของวันนี้ในระบบ — กรุณาลงเวลาใหม่','sync-fail');
+    }
+    return;
+  }catch(e){}
+  const local=getLocalToday();
+  if(local&&local.synced) showCheckedCard(local);
+}
+function getLocalToday(){
+  try{
+    const logs=JSON.parse(localStorage.getItem('ward_logs_v3')||'[]');
+    return logs.find(l=>l.email===currentUser.email&&l.date===todayKey())||null;
+  }catch(e){ return null; }
+}
+// แปลงคำตอบ server (สถานะเป็นข้อความไทย) → รูปแบบที่การ์ดใช้
+function fromServer(j){
+  const st=String(j.status||'');
+  const ontime=st==='ontime'||st.indexOf('ตรงเวลา')>=0;
+  return { time:j.time||'—', status:ontime?'ontime':'late',
+           late:Number(j.late)||0, deduct:Number(j.deduct)||0,
+           dist:j.dist!=null&&j.dist!==''?j.dist:'—' };
+}
+
 function showCheckedCard(e){
   todayCheckedIn=true;
   const badge=e.status==='ontime'?`<span style="color:var(--green)">✓ ตรงเวลา</span>`:`<span style="color:var(--amber)">⚠ สาย ${e.late} นาที · หัก ${e.deduct} คะแนน</span>`;
   document.getElementById('checkinArea').innerHTML=`<div class="checked-card"><div class="big">${e.time}</div><div class="sub">ลงเวลาแล้ววันนี้ · ${badge}</div><div class="sub" style="margin-top:4px;font-family:var(--mono);font-size:11px">${e.dist} ม. จากวอร์ด</div></div>`;
 }
+
+let sending=false;
 async function doCheckin(){
-  if(!currentUser||geoState!=='ok'||todayCheckedIn) return;
+  if(!currentUser||geoState!=='ok'||todayCheckedIn||sending) return;
+  sending=true;
+  const btn=document.getElementById('btnCheckin');
+  if(btn){ btn.disabled=true; btn.className='btn-checkin not-ready'; btn.textContent='⏳ กำลังบันทึก… อย่าปิดหน้านี้'; }
+
   const n=new Date(),p=x=>String(x).padStart(2,'0');
-  const ts=`${p(n.getHours())}:${p(n.getMinutes())}`;
   const full=`${p(n.getHours())}:${p(n.getMinutes())}:${p(n.getSeconds())}`;
-  const{status,late,deduct}=calcDeduction(ts);
   const entry={
     email:currentUser.email,name:currentUser.name,date:todayKey(),
-    time:full,status,late,deduct,dist:Math.round(lastDist||0),
+    time:full,dist:Math.round(lastDist||0),
     lat:lastCoords?.lat,lng:lastCoords?.lng,accuracy:Math.round(lastCoords?.accuracy||0),
     photo:photoBase64,
     deviceId:deviceFingerprint||'unknown',
-    synced:false,
   };
-  try{const logs=JSON.parse(localStorage.getItem('ward_logs_v3')||'[]');logs.unshift(entry);localStorage.setItem('ward_logs_v3',JSON.stringify(logs.slice(0,100)));}catch(e){}
-  sendToSheets(entry);
-  showCheckedCard(entry); renderLog();
-  showToast(status==='ontime'?`✓ ลงเวลาสำเร็จ ${full} — ตรงเวลา`:`⚠ ลงเวลาสำเร็จ ${full} — สาย ${late} นาที หัก ${deduct} คะแนน`);
-}
 
-// ── Send to Sheets ──
-function sendToSheets(entry){
-  if(CONFIG.APPS_SCRIPT_URL.startsWith('YOUR_')){
-    document.getElementById('syncStatus').textContent='⚠ ยังไม่ได้ตั้งค่า Apps Script URL';
-    document.getElementById('syncStatus').className='sync-status sync-fail';
+  const res=await sendToSheets(entry);
+  sending=false;
+
+  if(!res.ok){
+    // ★ ไม่สำเร็จ → ไม่ล็อก ให้กดใหม่ได้
+    setSync('❌ ยังไม่ได้บันทึก — '+res.msg+' กรุณากดลงเวลาอีกครั้ง','sync-fail');
+    showToast('❌ บันทึกไม่สำเร็จ — กดลงเวลาอีกครั้ง');
+    if(btn){ btn.disabled=false; updateCheckinBtn(); if(geoState==='ok'&&photoBase64){btn.className='btn-checkin ready';btn.textContent='↻ ลองลงเวลาอีกครั้ง';} }
     return;
   }
-  document.getElementById('syncStatus').textContent='⏳ กำลังส่งข้อมูลไป Sheets…';
-  document.getElementById('syncStatus').className='sync-status sync-pending';
-  fetch(CONFIG.APPS_SCRIPT_URL,{
-    method:'POST', mode:'no-cors',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(entry),
-  }).then(()=>{
-    document.getElementById('syncStatus').textContent=`✓ ซิงค์ข้อมูลสำเร็จ ${new Date().toLocaleTimeString('th-TH')}`;
-    document.getElementById('syncStatus').className='sync-status sync-ok';
-  }).catch(()=>{
-    document.getElementById('syncStatus').textContent='❌ ส่งข้อมูลไม่สำเร็จ — บันทึกในเครื่องแล้ว';
-    document.getElementById('syncStatus').className='sync-status sync-fail';
-  });
+
+  if(res.duplicate){
+    setSync('✓ วันนี้ลงเวลาไปแล้ว (ไม่บันทึกซ้ำ)','sync-ok');
+    showToast('ℹ วันนี้ลงเวลาไปแล้ว');
+    checkAlreadyCheckedIn();
+    return;
+  }
+
+  // ใช้ผลจาก server (เวลา/สาย/หักคะแนนจริง)
+  const rec={...entry, photo:undefined, status:res.data.status==='ontime'?'ontime':'late',
+             late:Number(res.data.late)||0, deduct:Number(res.data.deduct)||0, synced:true};
+  try{const logs=JSON.parse(localStorage.getItem('ward_logs_v3')||'[]');logs.unshift(rec);localStorage.setItem('ward_logs_v3',JSON.stringify(logs.slice(0,100)));}catch(e){}
+  setSync(`✓ บันทึกในระบบแล้ว ${new Date().toLocaleTimeString('th-TH')}`,'sync-ok');
+  showCheckedCard(rec); renderLog();
+  showToast(rec.status==='ontime'?`✓ ลงเวลาสำเร็จ ${full} — ตรงเวลา`:`⚠ ลงเวลาสำเร็จ ${full} — สาย ${rec.late} นาที หัก ${rec.deduct} คะแนน`);
+}
+
+// ── Send to Sheets ── รอคำตอบจริงจาก server
+// ส่งแบบ text/plain (ไม่ใส่ header) = simple request → อ่านผลได้ ไม่ต้อง no-cors
+async function sendToSheets(entry){
+  if(CONFIG.APPS_SCRIPT_URL.startsWith('YOUR_')) return {ok:false,msg:'ยังไม่ได้ตั้งค่า Apps Script URL'};
+  setSync('⏳ กำลังส่งข้อมูล…','sync-pending');
+  try{
+    const j=await fetchJSON(CONFIG.APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify(entry)},45000);
+    if(j&&j.success) return {ok:true,duplicate:!!j.duplicate,data:j};
+    return {ok:false,msg:(j&&j.error)||'server ไม่ตอบรับ'};
+  }catch(e){
+    // ส่งไปแล้วแต่อ่านผลไม่ได้ (เน็ตหลุด/หมดเวลา) → ถาม server ซ้ำว่าบันทึกเข้าไหม
+    try{
+      const c=await fetchJSON(`${CONFIG.APPS_SCRIPT_URL}?action=check&email=${encodeURIComponent(entry.email)}&date=${entry.date}`,null,12000);
+      if(c&&c.alreadyCheckedIn) return {ok:true,duplicate:true,data:c};
+    }catch(_){}
+    return {ok:false,msg:e.name==='AbortError'?'หมดเวลารอ (สัญญาณเน็ตอ่อน?)':'เชื่อมต่อไม่ได้'};
+  }
 }
 
 // ── Render log ──
