@@ -1,5 +1,6 @@
 <!--
   index.html ปี 5 (repo /5yrMedicalStudentOrthoKKUCheckin)
+  v3 · 30 ต.ค. 2569 — GPS อ่านต่อเนื่อง ≤15 วิ เลือกค่าแม่นสุด + ตัดสินจากระยะร่วมกับความคลาดเคลื่อน
   v2 · 28 ต.ค. 2569 — วันที่ใช้เวลาไทย (ไม่ใช่ UTC) · เช็คซ้ำจาก server · รอผลบันทึกจริงก่อนขึ้น "สำเร็จ" · เวลาตัดจาก server (รองรับวันหยุด)
 -->
 <!DOCTYPE html>
@@ -76,6 +77,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 .geo-info{flex:1;min-width:0}
 .geo-title{font-weight:500;font-size:14px}
 .geo-sub{font-size:11px;color:var(--muted);margin-top:2px;font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.geo-hint{font-size:12px;color:var(--amber);line-height:1.6;margin-top:8px;padding:0 4px;display:none}
 .geo-dist{font-family:var(--mono);font-size:13px;font-weight:500;flex-shrink:0;text-align:right}
 .btn-checkin{width:100%;padding:17px;border-radius:var(--r);border:none;font-family:var(--font);font-size:16px;font-weight:600;cursor:pointer;transition:all .2s;letter-spacing:.02em}
 .btn-checkin.ready{background:var(--green);color:#052e16}
@@ -170,6 +172,7 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
       </div>
       <div class="geo-dist" id="geoDist">—</div>
     </div>
+    <div class="geo-hint" id="geoHint"></div>
   </div>
   <div class="gap"></div>
 
@@ -225,6 +228,9 @@ const CONFIG = {
   WARD_LAT:       16.468611,
   WARD_LNG:       102.829278,
   RADIUS_M:       25,
+  GPS_MAX_ACC:    50,     // ความคลาดเคลื่อนสูงสุดที่ยอมใช้กฎ "ระยะ − ความคลาดเคลื่อน"
+  GPS_GOOD_ACC:   25,     // แม่นพอ → หยุดอ่านทันที
+  GPS_WATCH_MS:   15000,  // อ่านต่อเนื่องนานสุด
   CUTOFF_WEEKDAY: '07:00',   // จันทร์-ศุกร์
   CUTOFF_WEEKEND: '07:30',   // เสาร์-อาทิตย์
   SERVER_CUTOFF: null,       // ได้จาก server (รวมวันหยุดราชการ) — ถ้ามีจะใช้ค่านี้ก่อน
@@ -286,6 +292,7 @@ function enterMain(){
 }
 function confirmLogout(){
   if(confirm('ออกจากระบบ?')){
+    stopGeoWatch(); setGeoHint('');
     currentUser=null; todayCheckedIn=false; geoState='idle';
     setGeoState('idle');
     document.getElementById('checkinArea').innerHTML=`<button class="btn-checkin not-ready" id="btnCheckin" onclick="doCheckin()" disabled>กดตรวจสอบตำแหน่งก่อน</button>`;
@@ -338,23 +345,61 @@ function setGeoState(state,sub,dist){
   if(state==='ok'){ updateCheckinBtn(); }
   else{btn.className='btn-checkin not-ready';btn.disabled=true;btn.textContent=state==='loading'?'กำลังตรวจสอบ…':state==='fail'?'ไม่สามารถลงเวลาได้ (นอกพื้นที่)':'กดตรวจสอบตำแหน่งก่อน';}
 }
+// ★ v3: อ่าน GPS ต่อเนื่องสูงสุด 15 วิ (มือถือจะแม่นขึ้นเรื่อย ๆ) แล้วใช้ค่าที่ดีที่สุด
+//   ผ่านถ้า (1) ระยะ ≤ 25 ม. หรือ (2) ความคลาดเคลื่อน ≤ 50 ม. และ ระยะ − ความคลาดเคลื่อน ≤ 25 ม.
+let geoWatchId=null, geoTimer=null;
+function gpsPass(dist,acc){
+  return dist<=CONFIG.RADIUS_M || (acc<=CONFIG.GPS_MAX_ACC && dist-acc<=CONFIG.RADIUS_M);
+}
+function setGeoHint(t){
+  const el=document.getElementById('geoHint'); if(!el) return;
+  el.textContent=t||''; el.style.display=t?'block':'none';
+}
+function stopGeoWatch(){
+  if(geoWatchId!=null){ navigator.geolocation.clearWatch(geoWatchId); geoWatchId=null; }
+  if(geoTimer){ clearTimeout(geoTimer); geoTimer=null; }
+}
 function checkLocation(){
   if(geoState==='loading'||todayCheckedIn) return;
   if(!('geolocation' in navigator)){setGeoState('fail','เบราว์เซอร์ไม่รองรับ GPS',null);return;}
+  stopGeoWatch(); setGeoHint('');
   setGeoState('loading');
-  navigator.geolocation.getCurrentPosition(
+  const t0=Date.now();
+  let best=null, bestPass=null, trail=[];
+
+  const finish=()=>{
+    stopGeoWatch();
+    const r=bestPass||best;
+    if(!r){ setGeoState('fail','ระบุตำแหน่งไม่ได้ — กดลองใหม่',null); return; }
+    lastCoords={lat:r.la,lng:r.lo,accuracy:r.ac};
+    const sub=`${r.la.toFixed(5)}, ${r.lo.toFixed(5)} (±${Math.round(r.ac)}ม.)`;
+    if(bestPass){ setGeoState('ok',sub,r.dist); setGeoHint(''); return; }
+    setGeoState('fail',sub,r.dist);
+    setGeoHint(r.ac>CONFIG.GPS_MAX_ACC
+      ? `GPS ยังไม่แม่น (±${Math.round(r.ac)} ม.) — เปิด Wi-Fi ไว้ (ไม่ต้องเชื่อมต่อ) เดินไปใกล้หน้าต่าง แล้วกดตรวจตำแหน่งใหม่`
+      : `อยู่ห่างวอร์ดประมาณ ${Math.round(r.dist)} ม. — เข้าใกล้วอร์ด 5ค แล้วกดตรวจตำแหน่งใหม่`);
+  };
+
+  geoWatchId=navigator.geolocation.watchPosition(
     pos=>{
       const{latitude:la,longitude:lo,accuracy:ac}=pos.coords;
-      lastCoords={lat:la,lng:lo,accuracy:ac};
       const dist=haversine(la,lo,CONFIG.WARD_LAT,CONFIG.WARD_LNG);
-      setGeoState(dist<=CONFIG.RADIUS_M?'ok':'fail',`${la.toFixed(5)}, ${lo.toFixed(5)} (±${Math.round(ac)}ม.)`,dist);
+      const r={la,lo,ac,dist};
+      if(!best||ac<best.ac) best=r;
+      if(gpsPass(dist,ac) && (!bestPass||ac<bestPass.ac)) bestPass=r;
+      trail.push('±'+Math.round(ac)); if(trail.length>4) trail.shift();
+      const sec=Math.round((Date.now()-t0)/1000);
+      document.getElementById('geoSub').textContent=`ความแม่นยำ ${trail.join(' → ')} ม. · ${sec} วิ`;
+      if(bestPass && bestPass.ac<=CONFIG.GPS_GOOD_ACC) finish();   // แม่นพอ หยุดเลย
     },
     err=>{
-      const m=err.code===1?'ไม่ได้รับสิทธิ์ GPS':err.code===2?'ระบุตำแหน่งไม่ได้':'หมดเวลา';
-      setGeoState('fail',m,null);
+      if(err.code===1){ stopGeoWatch(); setGeoState('fail','ไม่ได้รับสิทธิ์ GPS',null);
+        setGeoHint('อนุญาตตำแหน่งให้ Safari: Settings → Privacy → Location Services → Safari Websites → While Using'); return; }
+      // code 2/3 ระหว่างอ่าน: รอค่าถัดไปจนหมดเวลา
     },
-    {enableHighAccuracy:true,timeout:12000,maximumAge:0}
+    {enableHighAccuracy:true,timeout:CONFIG.GPS_WATCH_MS,maximumAge:0}
   );
+  geoTimer=setTimeout(finish,CONFIG.GPS_WATCH_MS);
 }
 
 // ── Check-in ──
