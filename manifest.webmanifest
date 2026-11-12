@@ -1,0 +1,17 @@
+{
+  "name": "เช็คอิน วอร์ด 5ค · ออร์โธ มข.",
+  "short_name": "เช็คอิน 5ค",
+  "description": "ลงเวลาราวน์เช้า นศ.พ. ชั้นปีที่ 5 สาขาวิชาออร์โธปิดิกส์ คณะแพทยศาสตร์ มหาวิทยาลัยขอนแก่น",
+  "lang": "th",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0a0f1e",
+  "theme_color": "#0a0f1e",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -1,5 +1,7 @@
 <!--
   index.html ปี 5 (repo /5yrMedicalStudentOrthoKKUCheckin)
+  v5 · 12 พ.ย. 2569 — PWA: ติดตั้งลงหน้าจอโฮม (manifest + service worker) · เปิดจากไอคอนใช้ Google Login แบบ redirect · เตือนเมื่อเปิดจาก LINE · ปุ่ม/คำแนะนำติดตั้ง
+  v4 · 12 พ.ย. 2569 — ส่งซ้ำอัตโนมัติ 3 ครั้ง + ส่ง tryNo/clientTime/prevErr ให้ tab "ผลการส่ง"
   v3 · 30 ต.ค. 2569 — GPS อ่านต่อเนื่อง ≤15 วิ เลือกค่าแม่นสุด + ตัดสินจากระยะร่วมกับความคลาดเคลื่อน
   v2 · 28 ต.ค. 2569 — วันที่ใช้เวลาไทย (ไม่ใช่ UTC) · เช็คซ้ำจาก server · รอผลบันทึกจริงก่อนขึ้น "สำเร็จ" · เวลาตัดจาก server (รองรับวันหยุด)
 -->
@@ -9,6 +11,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 <title>เช็คอิน วอร์ด 5ค</title>
+<!-- ★ v5 PWA -->
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<meta name="theme-color" content="#0a0f1e">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="เช็คอิน 5ค">
 <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://accounts.google.com/gsi/client" async></script>
 <style>
@@ -41,6 +52,12 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
 #googleBtn:hover{background:#f8f8f8;box-shadow:0 2px 8px rgba(0,0,0,.12)}
 #googleBtn svg{width:20px;height:20px;flex-shrink:0}
 .domain-err{width:100%;background:var(--red-dim);border:1px solid rgba(239,68,68,0.25);border-radius:var(--rsm);padding:12px 16px;font-size:13px;color:var(--red);display:none}
+/* ★ v5 ติดตั้งแอป / เตือน LINE */
+.app-box{width:100%;border-radius:var(--rsm);padding:12px 16px;font-size:13px;line-height:1.7;display:none}
+.app-box.warn{background:var(--amber-dim);border:1px solid rgba(245,158,11,0.3);color:var(--amber)}
+.app-box.info{background:var(--accent-dim);border:1px solid rgba(59,130,246,0.3);color:#93c5fd}
+.app-box b{color:var(--text)}
+.btn-install{width:100%;padding:11px;border-radius:10px;border:1px solid rgba(59,130,246,0.4);background:transparent;color:#93c5fd;font-family:var(--font);font-size:14px;font-weight:500;cursor:pointer;margin-top:8px}
 
 /* MAIN */
 #mainScreen{gap:0;padding-top:0}
@@ -114,12 +131,17 @@ body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:1
   <div class="login-title">เช็คอิน วอร์ด 5ค</div>
   <div class="login-sub">ระบบลงเวลา · นศ.พ. ชั้นปีที่ 5</div>
   <div class="login-box">
+    <div class="app-box warn" id="inAppWarn">⚠ คุณเปิดลิงก์จากแอปแชท (เช่น LINE) ซึ่ง Login Google ไม่ได้<br>แตะ <b>⋯ / ไอคอนเข็มทิศ → เปิดใน Safari หรือ Chrome</b></div>
     <div class="domain-badge">✓ @kkumail.com / @kku.ac.th</div>
     <button id="googleBtn" onclick="startGoogleLogin()">
       <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.47 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
       เข้าสู่ระบบด้วย Google
     </button>
     <div class="domain-err" id="domainErr">❌ กรุณาใช้ @kkumail.com หรือ @kku.ac.th เท่านั้น</div>
+    <div class="app-box info" id="installBox">
+      <span id="installText"></span>
+      <button class="btn-install" id="btnInstall" style="display:none" onclick="doInstall()">📲 ติดตั้งเป็นแอป</button>
+    </div>
     <div class="login-note">ระบบจะตรวจสอบว่าคุณอยู่ใน<br><span>รัศมี 25 เมตรจากวอร์ด 5ค</span><br>ก่อนอนุญาตให้ลงเวลา</div>
   </div>
 </div>
@@ -242,29 +264,84 @@ const CONFIG = {
   APPS_SCRIPT_URL:'https://script.google.com/macros/s/AKfycbyaiv2J9v56ilTv3v-08IaUtNr1k8AkhxOu79tjbqLQckssAUj0i9i3y-z3EJNZfypm/exec',  // จาก Google Apps Script
   SHEET_URL:      'https://docs.google.com/spreadsheets/d/1XIlsAKTmloLDWIccTo8NOaH-1qfZfXlmos05vtvLrRA/edit?gid=0#gid=0',
   TEACHER_EMAILS: ['kittwi-cvt@kkumail.com', 'kittwi@kku.ac.th'],  // ← ใส่ email อาจารย์ที่ต้องการให้เห็น Sheet        // ลิงก์ Google Sheet
+  // ★ v5: ปลายทางหลัง Login แบบ redirect (ต้องใส่ URL นี้ใน Cloud Console → Authorized redirect URIs)
+  get REDIRECT_URI() { return location.origin + location.pathname.replace(/index\.html$/, ''); },
 };
 
 let currentUser=null, geoState='idle', lastDist=null, lastCoords=null, todayCheckedIn=false;
 
+// ── ★ v5 PWA: โหมดแอป / แอปแชท ──
+function isStandalone(){ return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone===true; }
+function isInAppBrowser(){ return /Line\/|FBAN|FBAV|Instagram|MicroMessenger|KAKAOTALK/i.test(navigator.userAgent); }
+function isIOS(){ return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform==='MacIntel' && navigator.maxTouchPoints>1); }
+let installEvt=null;
+window.addEventListener('beforeinstallprompt',e=>{ e.preventDefault(); installEvt=e; setupAppBoxes(); });
+window.addEventListener('appinstalled',()=>{ installEvt=null; setupAppBoxes(); });
+function setupAppBoxes(){
+  const warn=document.getElementById('inAppWarn'), box=document.getElementById('installBox'),
+        txt=document.getElementById('installText'), btn=document.getElementById('btnInstall');
+  warn.style.display=isInAppBrowser()?'block':'none';
+  if(isStandalone()||isInAppBrowser()){ box.style.display='none'; return; }
+  if(installEvt){
+    txt.innerHTML='ติดตั้งเป็นแอปไว้ที่หน้าจอโฮม เปิดได้ทันทีทุกเช้า';
+    btn.style.display='block'; box.style.display='block';
+  }else if(isIOS()){
+    txt.innerHTML='📲 ติดตั้งเป็นแอป: แตะปุ่ม <b>แชร์ (□↑)</b> → <b>เพิ่มไปยังหน้าจอโฮม</b> แล้วเปิดจากไอคอน "เช็คอิน 5ค"';
+    btn.style.display='none'; box.style.display='block';
+  }else{
+    box.style.display='none';
+  }
+}
+async function doInstall(){
+  if(!installEvt) return;
+  installEvt.prompt();
+  try{ await installEvt.userChoice; }catch(e){}
+  installEvt=null; setupAppBoxes();
+}
+
 // ── Google Login ──
 function startGoogleLogin(){
   if(CONFIG.CLIENT_ID.startsWith('YOUR_')){ demoLogin(); return; }
+  // ★ v5: เปิดจากไอคอน (โหมดแอป) popup ของ Google ส่งผลกลับไม่ได้ → ใช้ redirect แทน
+  if(isStandalone()){ redirectLogin(); return; }
   google.accounts.oauth2.initTokenClient({
     client_id:CONFIG.CLIENT_ID, scope:'openid profile email',
     callback:handleToken,
   }).requestAccessToken();
 }
+function redirectLogin(){
+  const state=Math.random().toString(36).slice(2)+Date.now().toString(36);
+  try{ sessionStorage.setItem('oauth_state',state); }catch(e){}
+  const p=new URLSearchParams({
+    client_id:CONFIG.CLIENT_ID, redirect_uri:CONFIG.REDIRECT_URI,
+    response_type:'token', scope:'openid profile email',
+    state, prompt:'select_account', include_granted_scopes:'true',
+  });
+  location.href='https://accounts.google.com/o/oauth2/v2/auth?'+p.toString();
+}
+// กลับจากหน้า Google: token อยู่ใน #access_token=…
+function handleRedirectReturn(){
+  const h=new URLSearchParams(location.hash.slice(1));
+  if(!h.has('access_token') && !h.has('error')) return false;
+  history.replaceState(null,'',location.pathname+location.search);   // ลบ token ออกจาก URL
+  if(h.has('error')){ showToast('❌ เข้าสู่ระบบไม่สำเร็จ — กดลองใหม่'); return true; }
+  let saved=null; try{ saved=sessionStorage.getItem('oauth_state'); sessionStorage.removeItem('oauth_state'); }catch(e){}
+  if(saved && h.get('state')!==saved){ showToast('❌ เข้าสู่ระบบไม่สำเร็จ — กดลองใหม่'); return true; }
+  handleToken({access_token:h.get('access_token')});
+  return true;
+}
 function handleToken(t){
   if(t.error) return;
   fetch('https://www.googleapis.com/oauth2/v3/userinfo',{headers:{Authorization:`Bearer ${t.access_token}`}})
   .then(r=>r.json()).then(info=>{
+    if(!info.email){ showToast('❌ อ่านข้อมูลบัญชีไม่ได้ — กดเข้าสู่ระบบใหม่'); return; }
     if(!CONFIG.ALLOWED_DOMAINS.includes(info.email.split('@')[1])){
       document.getElementById('domainErr').style.display='block'; return;
     }
     document.getElementById('domainErr').style.display='none';
     currentUser={name:info.name,email:info.email,picture:info.picture,given_name:info.given_name||info.name.split(' ')[0]};
     enterMain();
-  });
+  }).catch(()=>showToast('❌ เชื่อมต่อ Google ไม่ได้ — ตรวจสอบอินเทอร์เน็ต'));
 }
 function demoLogin(){
   currentUser={name:'นพ.ณัฐวุฒิ สมบูรณ์',email:'nattawut.s@kkumail.com',picture:null,given_name:'ณัฐวุฒิ'};
@@ -394,7 +471,9 @@ function checkLocation(){
     },
     err=>{
       if(err.code===1){ stopGeoWatch(); setGeoState('fail','ไม่ได้รับสิทธิ์ GPS',null);
-        setGeoHint('อนุญาตตำแหน่งให้ Safari: Settings → Privacy → Location Services → Safari Websites → While Using'); return; }
+        setGeoHint(isStandalone()
+          ? 'อนุญาตตำแหน่ง: Settings → Privacy → Location Services → Safari Websites → While Using แล้วปิด-เปิดแอปใหม่'
+          : 'อนุญาตตำแหน่งให้ Safari: Settings → Privacy → Location Services → Safari Websites → While Using'); return; }
       // code 2/3 ระหว่างอ่าน: รอค่าถัดไปจนหมดเวลา
     },
     {enableHighAccuracy:true,timeout:CONFIG.GPS_WATCH_MS,maximumAge:0}
@@ -656,6 +735,13 @@ async function initFingerprint() {
 initFingerprint();
 
 let tT; function showToast(m){const e=document.getElementById('toast');e.textContent=m;e.classList.add('show');clearTimeout(tT);tT=setTimeout(()=>e.classList.remove('show'),3800);}
+
+// ── ★ v5 PWA: เริ่มต้น ──
+setupAppBoxes();
+handleRedirectReturn();
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
 </script>
 </body>
 </html>
