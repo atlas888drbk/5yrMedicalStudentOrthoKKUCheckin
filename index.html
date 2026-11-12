@@ -523,19 +523,31 @@ async function doCheckin(){
 // ส่งแบบ text/plain (ไม่ใส่ header) = simple request → อ่านผลได้ ไม่ต้อง no-cors
 async function sendToSheets(entry){
   if(CONFIG.APPS_SCRIPT_URL.startsWith('YOUR_')) return {ok:false,msg:'ยังไม่ได้ตั้งค่า Apps Script URL'};
-  setSync('⏳ กำลังส่งข้อมูล…','sync-pending');
-  try{
-    const j=await fetchJSON(CONFIG.APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify(entry)},45000);
-    if(j&&j.success) return {ok:true,duplicate:!!j.duplicate,data:j};
-    return {ok:false,msg:(j&&j.error)||'server ไม่ตอบรับ'};
-  }catch(e){
-    // ส่งไปแล้วแต่อ่านผลไม่ได้ (เน็ตหลุด/หมดเวลา) → ถาม server ซ้ำว่าบันทึกเข้าไหม
+  const MAX=3, sleep=ms=>new Promise(r=>setTimeout(r,ms));
+  const stamp=()=>new Date().toLocaleString('sv-SE',{timeZone:'Asia/Bangkok'});
+  let lastMsg='เชื่อมต่อไม่ได้', prevErr='';
+  for(let i=1;i<=MAX;i++){
+    entry.tryNo=i; entry.clientTime=stamp(); entry.prevErr=prevErr;
+    setSync(i===1?'⏳ กำลังส่งข้อมูล…':`⏳ ส่งไม่สำเร็จ กำลังลองใหม่ครั้งที่ ${i}/${MAX}…`,'sync-pending');
+    const t0=Date.now();
     try{
-      const c=await fetchJSON(`${CONFIG.APPS_SCRIPT_URL}?action=check&email=${encodeURIComponent(entry.email)}&date=${entry.date}`,null,12000);
-      if(c&&c.alreadyCheckedIn) return {ok:true,duplicate:true,data:c};
-    }catch(_){}
-    return {ok:false,msg:e.name==='AbortError'?'หมดเวลารอ (สัญญาณเน็ตอ่อน?)':'เชื่อมต่อไม่ได้'};
+      // รอคำตอบจริงจาก server (text/plain = simple request อ่านผลได้)
+      const j=await fetchJSON(CONFIG.APPS_SCRIPT_URL,{method:'POST',body:JSON.stringify(entry)},i===1?45000:30000);
+      if(j&&j.success) return {ok:true,duplicate:!!j.duplicate,data:j};
+      lastMsg=(j&&j.error)||'server ไม่ตอบรับ';
+      prevErr=`try${i}: server: ${lastMsg} (${Math.round((Date.now()-t0)/1000)}s)`;
+    }catch(e){
+      lastMsg=e.name==='AbortError'?'หมดเวลารอ (สัญญาณเน็ตอ่อน?)':'เชื่อมต่อไม่ได้';
+      prevErr=`try${i}: ${e.name||'Error'} ${String(e.message||'').slice(0,40)} (${Math.round((Date.now()-t0)/1000)}s)`;
+      // ส่งไปแล้วแต่อ่านผลไม่ได้ → ถาม server ว่าบันทึกเข้าไหม ก่อนลองใหม่
+      try{
+        const c=await fetchJSON(`${CONFIG.APPS_SCRIPT_URL}?action=check&email=${encodeURIComponent(entry.email)}&date=${entry.date}`,null,12000);
+        if(c&&c.alreadyCheckedIn) return {ok:true,duplicate:true,data:c};
+      }catch(_){}
+    }
+    if(i<MAX) await sleep(1500*i);   // รอ 1.5 s, 3 s ก่อนลองใหม่
   }
+  return {ok:false,msg:lastMsg+' (ลองแล้ว '+MAX+' ครั้ง)'};
 }
 
 // ── Render log ──
