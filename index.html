@@ -1,5 +1,6 @@
 <!--
   index.html ปี 5 (repo /5yrMedicalStudentOrthoKKUCheckin)
+  v6 · 18 พ.ย. 2569 — เวลาตัดวันหยุด 07:30 → 08:00
   v5 · 12 พ.ย. 2569 — PWA: ติดตั้งลงหน้าจอโฮม (manifest + service worker) · เปิดจากไอคอนใช้ Google Login แบบ redirect · เตือนเมื่อเปิดจาก LINE · ปุ่ม/คำแนะนำติดตั้ง
   v4 · 12 พ.ย. 2569 — ส่งซ้ำอัตโนมัติ 3 ครั้ง + ส่ง tryNo/clientTime/prevErr ให้ tab "ผลการส่ง"
   v3 · 30 ต.ค. 2569 — GPS อ่านต่อเนื่อง ≤15 วิ เลือกค่าแม่นสุด + ตัดสินจากระยะร่วมกับความคลาดเคลื่อน
@@ -254,7 +255,7 @@ const CONFIG = {
   GPS_GOOD_ACC:   25,     // แม่นพอ → หยุดอ่านทันที
   GPS_WATCH_MS:   15000,  // อ่านต่อเนื่องนานสุด
   CUTOFF_WEEKDAY: '07:00',   // จันทร์-ศุกร์
-  CUTOFF_WEEKEND: '07:30',   // เสาร์-อาทิตย์
+  CUTOFF_WEEKEND: '08:00',   // เสาร์-อาทิตย์ + วันหยุดราชการ (v6: เดิม 07:30)
   SERVER_CUTOFF: null,       // ได้จาก server (รวมวันหยุดราชการ) — ถ้ามีจะใช้ค่านี้ก่อน
   get CUTOFF() {
     if (this.SERVER_CUTOFF) return this.SERVER_CUTOFF;
