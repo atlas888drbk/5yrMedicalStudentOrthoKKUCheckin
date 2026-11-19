@@ -1,6 +1,7 @@
 <!--
   index.html ปี 5 (repo /5yrMedicalStudentOrthoKKUCheckin)
   v6 · 18 พ.ย. 2569 — เวลาตัดวันหยุด 07:30 → 08:00
+  v7 · 20 พ.ย. 2569 — หักคะแนนสาย: 1–15 นาที −1 · 16–30 นาที −5 · >30 นาที −10
   v5 · 12 พ.ย. 2569 — PWA: ติดตั้งลงหน้าจอโฮม (manifest + service worker) · เปิดจากไอคอนใช้ Google Login แบบ redirect · เตือนเมื่อเปิดจาก LINE · ปุ่ม/คำแนะนำติดตั้ง
   v4 · 12 พ.ย. 2569 — ส่งซ้ำอัตโนมัติ 3 ครั้ง + ส่ง tryNo/clientTime/prevErr ให้ tab "ผลการส่ง"
   v3 · 30 ต.ค. 2569 — GPS อ่านต่อเนื่อง ≤15 วิ เลือกค่าแม่นสุด + ตัดสินจากระยะร่วมกับความคลาดเคลื่อน
@@ -488,8 +489,8 @@ function calcDeduction(t){
   const late=(h*60+m)-(ch*60+cm);
   if(late<=0) return{status:'ontime',late:0,deduct:0};
   if(late<=15) return{status:'late',late,deduct:1};
-  if(late<=30) return{status:'late',late,deduct:2};
-  return{status:'late',late,deduct:5};
+  if(late<=30) return{status:'late',late,deduct:5};
+  return{status:'late',late,deduct:10};
 }
 // ★ วันที่ตามเวลาไทยเสมอ (เดิมใช้ toISOString = UTC → ก่อน 07:00 กลายเป็น "เมื่อวาน")
 function todayKey(){return new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Bangkok'})}
